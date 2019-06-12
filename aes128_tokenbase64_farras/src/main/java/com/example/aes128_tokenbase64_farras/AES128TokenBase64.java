@@ -7,17 +7,18 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * Created by tehcpu on 11/12/17.
+ * Created by m farras muttaqin on 28/05 /19
  */
+
 public class AES128TokenBase64 {
     // current round index
     private int actual;
 
-    // number of chars (32 bit)
+    // number of chars (128 bits)
     private static int Nb = 4;
     private int Nk;
 
-    // number of rounds for current AES
+    // number of rounds for current AES, 10 Rounds (AES-128), 12 Rounds (AES-192) and 14 Rounds (AES-256)
     private int Nr;
 
     // state
@@ -27,10 +28,7 @@ public class AES128TokenBase64 {
     private int[] w;
     private int[] key;
 
-    // Initialization vector (only for CBC)
-    private byte[] iv;
-
-    // necessary matrix for AES (sBox + inverted one & rCon)
+    // AES Substitution Box Tabel (sBox Table)
     private static int[] sBox = new int[] {
             //0     1    2      3     4    5     6     7      8    9     A      B    C     D     E     F
             0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -50,6 +48,7 @@ public class AES128TokenBase64 {
             0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
             0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 };
 
+    // AES Inverse Substitution Box Tabel (Inverse sBox Table)
     private static int[] rsBox = new int[] {
             0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
             0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
@@ -68,62 +67,48 @@ public class AES128TokenBase64 {
             0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
             0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d };
 
+    // AES-128 Round Constant, hanya sampai 10, karena jumlah putaran pada AES-128 sebanyak 10x
     private static int[] rCon = new int[] {
             0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
 
+
+    // Konstruktor Kelas AES128TokenBase64
     public AES128TokenBase64(byte[] key) {
-        init(key, null);
+        init(key);
     }
 
-    public AES128TokenBase64(byte[] key, byte[] iv) {
-        init(key, iv);
-    }
-
-    private void init(byte[] key, byte[] iv) {
-        this.iv = iv;
+    private void init(byte[] key) {
         this.key = new int[key.length];
 
         for (int i = 0; i < key.length; i++) {
             this.key[i] = key[i];
         }
 
-        // AES standard (4*32) = 128 bits
+        // AES block cipher size (4*32) = 128 bits
         Nb = 4;
         switch (key.length) {
-            // 128 bit key
+            // 128 bit key (AES-128)
             case 16:
                 Nr = 10;
                 Nk = 4;
                 break;
-            // 192 bit key
-            case 24:
-                Nr = 12;
-                Nk = 6;
-                break;
-            // 256 bit key
-            case 32:
-                Nr = 14;
-                Nk = 8;
-                break;
             default:
-                throw new IllegalArgumentException("It only supports 128, 192 and 256 bit keys!");
+                throw new IllegalArgumentException("It only supports 128 bit keys");
         }
 
-        // The storage array creation for the states.
-        // Only 2 states with 4 rows and Nb columns are required.
+        // Inisialisasi pembuatan array yang menjadi state
+        // Hanya terdapat 2 states dengan 4 baris dan (Nb = 4) kolom
         state = new int[2][4][Nb];
 
-        // The storage vector for the expansion of the key creation.
+        // Penyimpanan vektor untuk menampung kunci yang di ekspansi
         w = new int[Nb * (Nr + 1)];
 
-        // Key expansion
+        // Melakukan ekspansi kunci
         expandKey();
     }
 
-    // The 128 bits of a state are an XOR offset applied to them with the 128 bits of the key expended.
-    // s: state matrix that has Nb columns and 4 rows.
-    // Round: A round of the key w to be added.
-    // s: returns the addition of the key per round
+
+    // Melakukan fungsi addRoundKey, yaitu proses penambahan sebuah "cipher key", yaitu kunci yang belum di ekspansi atau "round key", yaitu kunci yang sudah di ekspansi dengan "state" menggunakan operasi XOR.
     private int[][] addRoundKey(int[][] s, int round) {
         for (int c = 0; c < Nb; c++) {
             for (int r = 0; r < 4; r++) {
@@ -133,7 +118,7 @@ public class AES128TokenBase64 {
         return s;
     }
 
-    // Cipher/Decipher methods
+    // Cipher (Fungsi untuk melakukan proses enkripsi) / Decipher (Fungsi untuk melakukan proses deskripsi)
     private int[][] cipher(int[][] in, int[][] out) {
         for (int i = 0; i < in.length; i++) {
             for (int j = 0; j < in.length; j++) {
@@ -152,8 +137,6 @@ public class AES128TokenBase64 {
         subBytes(out);
         shiftRows(out);
         addRoundKey(out, actual);
-
-
         return out;
     }
 
@@ -224,7 +207,7 @@ public class AES128TokenBase64 {
 
     }
 
-    // Algorithm's general methods
+    // Fungsi Inverse mixColumns, pada tahap ini setiap kolom dari array state dikalikan dengan nilai konstan dari matriks Inverse Mix Columns
     private int[][] invMixColumnas(int[][] state) {
         int temp0, temp1, temp2, temp3;
         for (int c = 0; c < Nb; c++) {
@@ -241,6 +224,7 @@ public class AES128TokenBase64 {
         return state;
     }
 
+    // Fungsi Inverse Shift Row, yaitu proses pergeseran pada 3 baris terakhir dari array state, semuanya di geser ke arah Kanan.
     private int[][] invShiftRows(int[][] state) {
         int temp1, temp2, temp3, i;
 
@@ -272,7 +256,7 @@ public class AES128TokenBase64 {
         return state;
     }
 
-
+    // Pada proses Inverse Sub Bytes, setiap elemen pada array state akan dipetakan dengan tabel inverse s-box
     private int[][] invSubBytes(int[][] state) {
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < Nb; j++) {
@@ -292,6 +276,10 @@ public class AES128TokenBase64 {
         return subWord;
     }
 
+    // proses ekspansi kunci membangkitkan sejumlah round key sebanyak jumlah putaran AES-128 yaitu 10 round key.
+    // Proses ini dimulai dengan menyalin elemen kunci ke dalam larik w[0], w[1], w[2] dan w[3].
+    // Larik w[0] berisi empat elemen pertama key, w[1] berisi empat elemen berikutnya, dan seterusnya.
+    // Pada AES-128 proses ekspansi kunci menghasilkan 44 larik, dari larik ke-0 atau w(0) hingga larik ke-43 atau w(43).
     private int[] expandKey() {
         int temp, i = 0;
         while (i < Nk) {
@@ -318,6 +306,7 @@ public class AES128TokenBase64 {
         return w;
     }
 
+    // Fungsi mixColumns, pada tahap ini setiap kolom dari array state dikalikan dengan nilai konstan dari matriks Mix Columns
     private int[][] mixColumns(int[][] state) {
         int temp0, temp1, temp2, temp3;
         for (int c = 0; c < Nb; c++) {
@@ -355,6 +344,7 @@ public class AES128TokenBase64 {
     }
 
 
+    // Fungsi Shift Row, yaitu proses pergeseran pada 3 baris terakhir dari array state, semuanya di geser ke arah kiri.
     private int[][] shiftRows(int[][] state) {
         int temp1, temp2, temp3, i;
 
@@ -388,6 +378,7 @@ public class AES128TokenBase64 {
         return state;
     }
 
+    // Fungsi substitutive bytes, yaitu proses transformasi byte dimana setiap elemen pada array state yang diperoleh dari proses Add Round Key akan dipetakan dengan tabel subtitusi (S-box)
     private int[][] subBytes(int[][] state) {
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < Nb; j++) {
@@ -422,7 +413,7 @@ public class AES128TokenBase64 {
         return result;
     }
 
-    // Public methods
+    // Menggunakan mode enkripsi AES-128 dengan ECB (Electronic Code Book). Tujuannya yaitu jika terdapat state lebih dari 16 byte / 128 bits, maka state akan di-enkripsi secara pararel.
     public byte[] ECB_encrypt(byte[] text) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int i = 0; i < text.length; i+=16) {
@@ -433,12 +424,13 @@ public class AES128TokenBase64 {
             }
         }
 
-        // Proses enkode Base64 hasil enkripsi AES-128 yang disimpan pada fungsi out.toByteArray()
+        // Proses mengkombinasi algoritma Base64 dengan hasil enkripsi algoritma AES-128 yang disimpan pada fungsi out.toByteArray() dalam bentuk byte.
         return Base64.encode(out.toByteArray(),Base64.DEFAULT);
     }
 
+    // Menggunakan mode deskripsi AES-128 dengan ECB (Electronic Code Book). Tujuannya yaitu jika terdapat state lebih dari 16 byte / 128 bits, maka state akan di-deskripsi secara pararel.
     public byte[] ECB_decrypt(byte[] text) {
-         // Proses dekode Base64 hasil enkripsi AES-128 untuk di deskripsi
+        // Proses mengkombinasi algoritma Base64 untuk melakukan dekode pada hasil enkripsi AES-128 dalam bentuk karakter Base64 yang kemudian akan di deskripsi.
         text = Base64.decode(text, Base64.DEFAULT);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int i = 0; i < text.length; i+=16) {
@@ -451,39 +443,6 @@ public class AES128TokenBase64 {
         return out.toByteArray();
     }
 
-    public byte[] CBC_encrypt(byte[] text) {
-        byte[] previousBlock = null;
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        for (int i = 0; i < text.length; i+=16) {
-            byte[] part = Arrays.copyOfRange(text, i, i + 16);
-            try {
-                if (previousBlock == null) previousBlock = iv;
-                part = xor(previousBlock, part);
-                previousBlock = encrypt(part);
-                out.write(previousBlock);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        return out.toByteArray();
-    }
-
-    public byte[] CBC_decrypt(byte[] text) {
-        byte[] previousBlock = null;
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        for (int i = 0; i < text.length; i+=16) {
-            byte[] part = Arrays.copyOfRange(text, i, i + 16);
-            byte[] tmp = decrypt(part);
-            try {
-                if (previousBlock == null) previousBlock = iv;
-                tmp = xor(previousBlock, tmp);
-                previousBlock = part;
-                out.write(tmp);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        return out.toByteArray();
-    }
 }
+
 
