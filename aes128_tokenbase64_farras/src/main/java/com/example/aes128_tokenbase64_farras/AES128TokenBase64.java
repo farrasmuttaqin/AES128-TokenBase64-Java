@@ -438,6 +438,8 @@ public class AES128TokenBase64 {
     }
 
     public byte[] ECB_decrypt(byte[] text) {
+         // Proses dekode Base64 hasil enkripsi AES-128 untuk di deskripsi
+        text = Base64.decode(text, Base64.DEFAULT);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int i = 0; i < text.length; i+=16) {
             try {
