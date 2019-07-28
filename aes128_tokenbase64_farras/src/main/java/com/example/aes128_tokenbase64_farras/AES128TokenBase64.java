@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * Created by m farras muttaqin on 28/05 /19
+ * AES128TokenBase64 java library, Created by m farras muttaqin on 28/05 /19
  */
 
 public class AES128TokenBase64 {
