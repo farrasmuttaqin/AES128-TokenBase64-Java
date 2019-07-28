@@ -14,7 +14,7 @@ public class AES128TokenBase64 {
     // current round index
     private int actual;
 
-    // number of chars (128 bits)
+    // Number of block = 4 (ukuran state 4x4)
     private static int Nb = 4;
     private int Nk;
 
